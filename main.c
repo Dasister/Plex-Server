@@ -8,7 +8,9 @@
 #include <stdlib.h>
 
 #include <time.h>
+#ifndef __linux__
 #include <libc.h>
+#endif // Linux
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -16,10 +18,12 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <errno.h>
+
 #define SERVER "Avalank PLEX/1.0"
 #define PROTOCOL "HTTP/1.0"
 #define RFC1123FMT "%a, %d %b %Y %H:%M:%S GMT"
-#define PORT 80
+#define PORT 1234
 
 char *get_mime_type(char *name)
 {
@@ -144,28 +148,31 @@ int process(FILE *f)
                 if (len > 1) fprintf(f, "<A HREF=\"..\">..</A>\r\n");
                 
                 dir = opendir(path);
-                while ((de = readdir(dir)) != NULL)
-                {
-                    char timebuf[32];
-                    struct tm *tm;
-                    
-                    strcpy(pathbuf, path);
-                    strcat(pathbuf, de->d_name);
-                    
-                    stat(pathbuf, &statbuf);
-                    tm = gmtime(&statbuf.st_mtime);
-                    strftime(timebuf, sizeof(timebuf), "%d-%b-%Y %H:%M:%S", tm);
-                    
-                    fprintf(f, "<A HREF=\"%s%s\">", de->d_name, S_ISDIR(statbuf.st_mode) ? "/" : "");
-                    fprintf(f, "%s%s", de->d_name, S_ISDIR(statbuf.st_mode) ? "/</A>" : "</A> ");
-                    if (de->d_reclen < 32) fprintf(f, "%*s", 32 - de->d_reclen, "");
-                    
-                    if (S_ISDIR(statbuf.st_mode))
+		// ALWAYS CHECK THE RESULT OF SUCH FUNCTIONS! ALWAYS!
+		if (dir != NULL) {
+		  while ((de = readdir(dir)) != NULL)
+		    {
+		      char timebuf[32];
+		      struct tm *tm;
+		      
+		      strcpy(pathbuf, path);
+		      strcat(pathbuf, de->d_name);
+		      
+		      stat(pathbuf, &statbuf);
+		      tm = gmtime(&statbuf.st_mtime);
+		      strftime(timebuf, sizeof(timebuf), "%d-%b-%Y %H:%M:%S", tm);
+		      
+		      fprintf(f, "<A HREF=\"%s%s\">", de->d_name, S_ISDIR(statbuf.st_mode) ? "/" : "");
+		      fprintf(f, "%s%s", de->d_name, S_ISDIR(statbuf.st_mode) ? "/</A>" : "</A> ");
+		      if (de->d_reclen < 32) fprintf(f, "%*s", 32 - de->d_reclen, "");
+		      
+		      if (S_ISDIR(statbuf.st_mode))
                         fprintf(f, "%s\r\n", timebuf);
-                    else
+		      else
                         fprintf(f, "%s %10d\r\n", timebuf, statbuf.st_size);
-                }
-                closedir(dir);
+		    }
+		  closedir(dir);
+		}
                 
                 fprintf(f, "</PRE>\r\n<HR>\r\n<ADDRESS>%s</ADDRESS>\r\n</BODY></HTML>\r\n", SERVER);
             }
@@ -189,7 +196,10 @@ int main(int argc, char *argv[])
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = INADDR_ANY;
     sin.sin_port = htons(PORT);
-    bind(sock, (struct sockaddr *) &sin, sizeof(sin));
+    if (bind(sock, (struct sockaddr *) &sin, sizeof(sin)) < 0) {
+      printf("Socket binding error: %d\n", errno);
+      return -1;
+    }
     
     listen(sock, 5);
     printf("HTTP server listening on port %d at %s\n", PORT, inet_ntoa(sin.sin_addr));
