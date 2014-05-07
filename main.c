@@ -1,5 +1,5 @@
 
-//Copyright (C) Avalank 2014
+//Made by Avalank (GNU GPL v3)
 //Designed by Alexander Litreev in St. Petersburg, Russia
 //Working on Mac OS X 10.9
 
