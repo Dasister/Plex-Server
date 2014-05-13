@@ -1,3 +1,4 @@
+
 //Made by Avalank (GNU GPL v3)
 //Designed by Alexander Litreev in St. Petersburg, Russia
 //Working on Mac OS X 10.9
@@ -27,7 +28,7 @@
 #define SERVER "Avalank PLEX/1.0"
 #define PROTOCOL "HTTP/1.0"
 #define RFC1123FMT "%a, %d %b %Y %H:%M:%S GMT"
-#define PORT 80
+#define PORT 1234
 
 char *get_mime_type(char *name)
 {
@@ -121,7 +122,9 @@ int process(FILE *f)
     int maxlen = strlen(get_host_path()) + strlen(path) + 1;
     path = realloc(path, maxlen);
     // Dirty code. Need to rewrite.
-    snprintf(path, maxlen, "%s%s", get_host_path(), path);
+    char *path_buf = strdup(path);
+    snprintf(path, maxlen, "%s%s", get_host_path(), path_buf);
+    free(path_buf);
     protocol = strtok(NULL, "\r");
     if (!method || !path || !protocol) return -1;
     
@@ -157,31 +160,31 @@ int process(FILE *f)
                 if (len > 1) fprintf(f, "<A HREF=\"..\">..</A>\r\n");
                 
                 dir = opendir(path);
-                // ALWAYS CHECK THE RESULT OF SUCH FUNCTIONS! ALWAYS!
-                if (dir != NULL) {
-                    while ((de = readdir(dir)) != NULL)
-                    {
-                        char timebuf[32];
-                        struct tm *tm;
-                        
-                        strcpy(pathbuf, path);
-                        strcat(pathbuf, de->d_name);
-                        
-                        stat(pathbuf, &statbuf);
-                        tm = gmtime(&statbuf.st_mtime);
-                        strftime(timebuf, sizeof(timebuf), "%d-%b-%Y %H:%M:%S", tm);
-                        
-                        fprintf(f, "<A HREF=\"%s%s\">", de->d_name, S_ISDIR(statbuf.st_mode) ? "/" : "");
-                        fprintf(f, "%s%s", de->d_name, S_ISDIR(statbuf.st_mode) ? "/</A>" : "</A> ");
-                        if (de->d_reclen < 32) fprintf(f, "%*s", 32 - de->d_reclen, "");
-                        
-                        if (S_ISDIR(statbuf.st_mode))
-                            fprintf(f, "%s\r\n", timebuf);
-                        else
-                            fprintf(f, "%s %10d\r\n", timebuf, statbuf.st_size);
-                    }
-                    closedir(dir);
-                }
+		// ALWAYS CHECK THE RESULT OF SUCH FUNCTIONS! ALWAYS!
+		if (dir != NULL) {
+		  while ((de = readdir(dir)) != NULL)
+		    {
+		      char timebuf[32];
+		      struct tm *tm;
+		      
+		      strcpy(pathbuf, path);
+		      strcat(pathbuf, de->d_name);
+		      
+		      stat(pathbuf, &statbuf);
+		      tm = gmtime(&statbuf.st_mtime);
+		      strftime(timebuf, sizeof(timebuf), "%d-%b-%Y %H:%M:%S", tm);
+		      
+		      fprintf(f, "<A HREF=\"%s%s\">", de->d_name, S_ISDIR(statbuf.st_mode) ? "/" : "");
+		      fprintf(f, "%s%s", de->d_name, S_ISDIR(statbuf.st_mode) ? "/</A>" : "</A> ");
+		      if (de->d_reclen < 32) fprintf(f, "%*s", 32 - de->d_reclen, "");
+		      
+		      if (S_ISDIR(statbuf.st_mode))
+                        fprintf(f, "%s\r\n", timebuf);
+		      else
+                        fprintf(f, "%s %10d\r\n", timebuf, statbuf.st_size);
+		    }
+		  closedir(dir);
+		}
                 
                 fprintf(f, "</PRE>\r\n<HR>\r\n<ADDRESS>%s</ADDRESS>\r\n</BODY></HTML>\r\n", SERVER);
             }
@@ -189,51 +192,54 @@ int process(FILE *f)
     }
     else
         send_file(f, path, &statbuf);
-    
+   
+    // Free!
+    free(path);
+ 
     return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    init_settings();
-    
-    int sock;
-    struct sockaddr_in sin;
-    
-    printf("Avalank Plex Server 1.0\n");
-    
-    if (!parse_commandline_parameters(argc, argv)) {
-        return -1;
-    }
-    
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(PORT);
-    if (bind(sock, (struct sockaddr *) &sin, sizeof(sin)) < 0) {
-        printf("Socket binding error: %d\n", errno);
-        return -1;
-    }
-    
-    listen(sock, 5);
-    printf("HTTP server listening on port %d at %s\n", PORT, inet_ntoa(sin.sin_addr));
-    printf("Virtual server path: %s\n", get_host_path());
-    
-    while (1)
+  init_settings();
+  
+  int sock;
+  struct sockaddr_in sin;
+  
+  printf("Avalank Plex Server 1.0\n");
+  
+  if (!parse_commandline_parameters(argc, argv)) {
+    return -1;
+  }
+
+  sock = socket(AF_INET, SOCK_STREAM, 0);
+  
+  sin.sin_family = AF_INET;
+  sin.sin_addr.s_addr = INADDR_ANY;
+  sin.sin_port = htons(PORT);
+  if (bind(sock, (struct sockaddr *) &sin, sizeof(sin)) < 0) {
+    printf("Socket binding error: %d\n", errno);
+    return -1;
+  }
+  
+  listen(sock, 5);
+  printf("HTTP server listening on port %d at %s\n", PORT, inet_ntoa(sin.sin_addr));
+  printf("Virtual server path: %s\n", get_host_path());
+  
+  while (1)
     {
-        int s;
-        FILE *f;
-        
-        s = accept(sock, NULL, NULL);
-        if (s < 0) break;
-        
-        f = fdopen(s, "r+");
-        process(f);
-        fclose(f);
+      int s;
+      FILE *f;
+      
+      s = accept(sock, NULL, NULL);
+      if (s < 0) break;
+      
+      f = fdopen(s, "r+");
+      process(f);
+      fclose(f);
     }
-    
-    free_settings();
-    close(sock);
-    return 0;
+  
+  free_settings();
+  close(sock);
+  return 0;
 }
