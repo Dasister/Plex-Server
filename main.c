@@ -28,7 +28,7 @@
 #define SERVER "Avalank PLEX/1.0"
 #define PROTOCOL "HTTP/1.0"
 #define RFC1123FMT "%a, %d %b %Y %H:%M:%S GMT"
-#define PORT 1234
+#define PORT 80
 
 char *get_mime_type(char *name)
 {
