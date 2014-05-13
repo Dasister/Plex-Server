@@ -1,14 +1,16 @@
 CC=gcc
 CFLAGS=-c -Wall
-LDFLAGS=
-SOURCES=main.c
-OBJECTS=$(SOURCES:.cpp=.o)
+LDFLAGS=-std=gnu99
+SOURCES=main.c settings.c string.c
+OBJECTS=$(SOURCES:.c=.o)
+BUILDDIR=./build
 EXECUTABLE=plexserver
 
 all: $(SOURCES) $(EXECUTABLE)
-    
-$(EXECUTABLE): $(OBJECTS) 
-    $(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-.cpp.o:
-    $(CC) $(CFLAGS) $< -o $@
+$(EXECUTABLE): $(OBJECTS) 
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+
+.c.o:
+	$(CC) $(CFLAGS) $< -o $@
+
